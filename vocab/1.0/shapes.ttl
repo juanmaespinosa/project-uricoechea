@@ -1,0 +1,446 @@
+# SHACL shapes of the S6 application profile (spec 6.5, ADR 0012): a constrained reuse of RiC-O 1.1,
+# PROV-O, the W3C Web Annotation vocabulary, PREMIS 3 and a few Dublin Core / SKOS / DCAT terms.
+# The shapes ARE the profile; no new ontology is authored. The values the profile defines (activity
+# types, kinds of zone, form types, two constants) are in cris_rdf_profile.ttl: a graph is validated
+# together with that file, which the exporter writes into every export.
+#
+# Every RiC-O, PROV-O, Web Annotation and PREMIS term below was looked up in the vocabulary files
+# (RiC-O_1-1.rdf, prov-o.ttl, oa.ttl, premis3.owl). Dublin Core definitions were read in a copy of
+# the DCMI terms without their formal ranges; SKOS and DCAT terms exist in rdflib's namespaces.
+#
+# Shapes are closed where text could otherwise leak into the RDF (decision A1): a property that is
+# not listed is refused. No resource is a blank node (decision Q1): every target, selector and
+# checksum has its own address, so the export is byte-for-byte reproducible.
+#
+# Not checked here, because SHACL cannot or the exporter does it: that a language tag is
+# registered (ADR 0004; the exporter uses the IANA registry), that a polygon lies inside its page,
+# and that the TEI licence is the one in the corpus config.
+
+@prefix sh:      <http://www.w3.org/ns/shacl#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcat:    <http://www.w3.org/ns/dcat#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov:    <http://www.w3.org/ns/prov#> .
+@prefix oa:      <http://www.w3.org/ns/oa#> .
+@prefix premis:  <http://www.loc.gov/premis/rdf/v3/> .
+@prefix crypHashFunc: <http://id.loc.gov/vocabulary/preservation/cryptographicHashFunctions/> .
+@prefix rico:    <https://www.ica.org/standards/RiC/ontology#> .
+@prefix ontolex: <http://www.w3.org/ns/lemon/ontolex#> .
+@prefix cris:    <https://w3id.org/project-uricoechea/vocab/1.0#> .
+@prefix shape:   <https://w3id.org/project-uricoechea/vocab/1.0/shapes#> .
+
+# --- Prefixes for the SPARQL constraints -----------------------------------------------------
+shape:Prefixes a owl:Ontology ;
+    sh:declare
+        [ sh:prefix "rico" ; sh:namespace "https://www.ica.org/standards/RiC/ontology#"^^xsd:anyURI ] ,
+        [ sh:prefix "prov" ; sh:namespace "http://www.w3.org/ns/prov#"^^xsd:anyURI ] ,
+        [ sh:prefix "oa" ; sh:namespace "http://www.w3.org/ns/oa#"^^xsd:anyURI ] ,
+        [ sh:prefix "dcat" ; sh:namespace "http://www.w3.org/ns/dcat#"^^xsd:anyURI ] ,
+        [ sh:prefix "dcterms" ; sh:namespace "http://purl.org/dc/terms/"^^xsd:anyURI ] ,
+        [ sh:prefix "cris" ; sh:namespace "https://w3id.org/project-uricoechea/vocab/1.0#"^^xsd:anyURI ] .
+
+# --- Document ---------------------------------------------------------------------------------
+shape:Document a sh:NodeShape ;
+    sh:targetClass rico:Record ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rico:identifier ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+                  sh:message "A document needs exactly one identifier (the S4 id)." ] ;
+    sh:property [ sh:path rico:title ; sh:minCount 1 ; sh:datatype rdf:langString ;
+                  sh:message "A document needs a title with a language tag." ] ;
+    sh:property [ sh:path rico:hasOrHadLanguage ; sh:minCount 1 ; sh:class rico:Language ;
+                  sh:node shape:Language ;
+                  sh:message "A document needs a language (a rico:Language resource)." ] ;
+    sh:property [ sh:path rico:hasAuthor ;
+                  sh:or ( [ sh:class rico:Person ] [ sh:class rico:CorporateBody ] ) ;
+                  sh:message "The author must be a person or an organisation." ] ;
+    # the TEI of the document: exactly one, with its licence, publisher and checksum (R-06, R-07, R-23)
+    sh:property [ sh:path rico:hasOrHadInstantiation ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:node shape:TeiInstantiation ;
+                  sh:message "A document needs exactly one instantiation: its TEI file, with format, licence, publisher and checksum." ] ;
+    sh:property [ sh:path rico:hasOrHadDigitalInstantiation ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:node shape:ManifestInstantiation ;
+                  sh:message "A document has exactly one IIIF manifest (decision AK1)." ] ;
+    # the resource that describes the document in RDF states the RDF's own licence (R-07)
+    sh:property [ sh:path [ sh:inversePath rico:describesOrDescribed ] ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:node shape:RdfDescription ;
+                  sh:message "A document needs exactly one description resource, which states the licence of the RDF." ] ;
+    sh:property [ sh:path [ sh:inversePath rico:isOrWasPartOf ] ;
+                  sh:qualifiedValueShape [ sh:class rico:RecordPart ] ; sh:qualifiedMinCount 1 ;
+                  sh:message "A document needs at least one page." ] ;
+    sh:property [ sh:path rico:hasDocumentaryFormType ; sh:maxCount 1 ; sh:class rico:DocumentaryFormType ] ;
+    # transmission status and orthographic norms (R-19, decision W1); required for Spanish below
+    sh:property [ sh:path rico:hasRecordState ; sh:maxCount 1 ; sh:class rico:RecordState ;
+                  sh:message "A document has at most one transmission status, a rico:RecordState." ] ;
+    sh:property [ sh:path rico:isOrWasRegulatedBy ; sh:class rico:Rule ;
+                  sh:message "An orthographic norm is a rico:Rule." ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "The RDF must be derived from the TEI of the document it describes." ;
+        sh:select """
+            SELECT $this WHERE {
+              ?d rico:describesOrDescribed $this ; prov:wasDerivedFrom ?x .
+              FILTER NOT EXISTS { $this rico:hasOrHadInstantiation ?x }
+            }""" ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "A Spanish document needs its transmission status (spec 5.6)." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this rico:hasOrHadLanguage/rico:identifier ?tag .
+              FILTER (?tag = "es" || STRSTARTS(?tag, "es-"))
+              FILTER NOT EXISTS { $this rico:hasRecordState ?s }
+            }""" ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "A Spanish document needs its orthographic norm (spec 5.3)." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this rico:hasOrHadLanguage/rico:identifier ?tag .
+              FILTER (?tag = "es" || STRSTARTS(?tag, "es-"))
+              FILTER NOT EXISTS { $this rico:isOrWasRegulatedBy ?r }
+            }""" ] ;
+    # no RDF with the provisional base leaves the project unless it says so (R-24, decision J2)
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "The base address is provisional, and no dataset description says so." ;
+        sh:select """
+            SELECT $this WHERE {
+              FILTER (STRSTARTS(STR($this), "https://example.org/"))
+              FILTER NOT EXISTS {
+                ?ds a dcat:Dataset ; dcterms:description ?text .
+                FILTER (CONTAINS(LCASE(STR(?text)), "provisional"))
+              }
+            }""" ] .
+
+# A letter must name its author (spec 6.4, 5.6).
+shape:Letter a sh:NodeShape ;
+    sh:targetSubjectsOf rico:hasDocumentaryFormType ;
+    sh:or ( [ sh:not [ sh:property [ sh:path rico:hasDocumentaryFormType ; sh:hasValue cris:letter ] ] ]
+            [ sh:property [ sh:path rico:hasAuthor ; sh:minCount 1 ] ] ) ;
+    sh:message "A letter must have an author." .
+
+# ADR 0004: lower-case language, then an optional Title-case script and upper-case region.
+shape:Language a sh:NodeShape ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rico:identifier ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+                  sh:pattern "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$" ;
+                  sh:message "A language carries its canonical BCP 47 tag as identifier (ADR 0004)." ] .
+
+shape:TeiInstantiation a sh:NodeShape ;
+    sh:class rico:Instantiation , premis:File ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path dcterms:format ; sh:minCount 1 ; sh:maxCount 1 ; sh:hasValue "application/tei+xml" ;
+                  sh:message "The TEI instantiation has the format application/tei+xml." ] ;
+    sh:property [ sh:path dcterms:license ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ;
+                  sh:message "The TEI instantiation states one licence, by its address." ] ;
+    # the publishers of the digital edition, not of the historical work (decision P2)
+    sh:property [ sh:path dcterms:publisher ; sh:minCount 1 ;
+                  sh:or ( [ sh:class rico:Person ] [ sh:class rico:CorporateBody ] ) ;
+                  sh:message "The TEI instantiation names its publisher, a person or an organisation." ] ;
+    sh:property [ sh:path premis:fixity ; sh:minCount 1 ; sh:maxCount 1 ; sh:node shape:Sha256 ;
+                  sh:message "The TEI instantiation carries the SHA-256 of the TEI file (staleness gate R-23)." ] .
+
+# The IIIF manifest of a document and the canvas of a page (decision AK1): digital instantiations at the
+# addresses S7 writes (ADR 0013). The canvas is derived from the master of its own page.
+shape:ManifestInstantiation a sh:NodeShape ;
+    sh:class rico:Instantiation ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path dcterms:format ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:hasValue "application/ld+json;profile=\"http://iiif.io/api/presentation/3/context.json\"" ;
+                  sh:message "The IIIF manifest has the IIIF Presentation 3 media type." ] .
+
+shape:CanvasInstantiation a sh:NodeShape ;
+    sh:class rico:Instantiation ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rico:isOrWasDerivedFromInstantiation ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:class premis:File ;
+                  sh:message "A canvas is derived from exactly one image file." ] .
+
+shape:ImageInstantiation a sh:NodeShape ;
+    sh:class rico:Instantiation , premis:File ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path premis:fixity ; sh:minCount 1 ; sh:maxCount 1 ; sh:node shape:Sha256 ;
+                  sh:message "The image of a page carries the SHA-256 of its master (R-11)." ] .
+
+# PREMIS fixity as in RiC-O's and PREMIS's own examples (decision G1).
+shape:Sha256 a sh:NodeShape ;
+    sh:nodeKind sh:IRI ;
+    sh:class crypHashFunc:sha256 ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rdf:value ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+                  sh:pattern "^[0-9a-f]{64}$" ;
+                  sh:message "A SHA-256 is 64 lower-case hexadecimal characters." ] .
+
+shape:RdfDescription a sh:NodeShape ;
+    sh:targetSubjectsOf rico:describesOrDescribed ;
+    sh:class prov:Entity ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rico:describesOrDescribed ; sh:minCount 1 ; sh:maxCount 1 ; sh:class rico:Record ] ;
+    sh:property [ sh:path dcterms:license ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:hasValue <https://creativecommons.org/publicdomain/zero/1.0/> ;
+                  sh:message "The RDF is stated as CC0 1.0." ] ;
+    sh:property [ sh:path prov:wasDerivedFrom ; sh:minCount 1 ; sh:maxCount 1 ; sh:class rico:Instantiation ;
+                  sh:message "The RDF is derived from exactly one TEI instantiation." ] .
+
+# The dataset that says, in Spanish and English, that the base is provisional (decision J2).
+shape:Dataset a sh:NodeShape ;
+    sh:targetClass dcat:Dataset ;
+    sh:property [ sh:path dcterms:description ; sh:minCount 2 ; sh:languageIn ( "es" "en" ) ; sh:uniqueLang true ;
+                  sh:message "The dataset has one description in Spanish and one in English." ] ;
+    sh:property [ sh:path dcterms:license ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:hasValue <https://creativecommons.org/publicdomain/zero/1.0/> ] .
+
+# --- Agents -------------------------------------------------------------------------------------
+shape:Person a sh:NodeShape ;
+    sh:targetClass rico:Person ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rdf:type ; sh:hasValue prov:Person ] ;
+    sh:property [ sh:path rdfs:label ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+                  sh:message "A person has one main name." ] ;
+    sh:property [ sh:path skos:altLabel ; sh:datatype xsd:string ] ;
+    # decision M1: the entity address of an authority, never the address of a web page about it
+    sh:property [ sh:path owl:sameAs ; sh:nodeKind sh:IRI ; sh:not [ sh:pattern "wikidata\\.org/wiki/" ] ;
+                  sh:message "An authority link uses the entity address (wikidata.org/entity/Q...), not the page (wikidata.org/wiki/Q...)." ] .
+
+shape:Organisation a sh:NodeShape ;
+    sh:targetClass rico:CorporateBody ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rdf:type ; sh:hasValue prov:Organization ] ;
+    sh:property [ sh:path rdfs:label ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+                  sh:message "An organisation has one main name." ] ;
+    sh:property [ sh:path skos:altLabel ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path owl:sameAs ; sh:nodeKind sh:IRI ; sh:not [ sh:pattern "wikidata\\.org/wiki/" ] ] .
+
+shape:Engine a sh:NodeShape ;
+    sh:targetClass prov:SoftwareAgent ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rdfs:label ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+                  sh:message "An engine has one name." ] ;
+    sh:property [ sh:path premis:version ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ;
+                  sh:message "An engine has exactly one version." ] .
+
+# --- Pages -------------------------------------------------------------------------------------
+shape:Page a sh:NodeShape ;
+    sh:targetClass rico:RecordPart ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rico:identifier ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path rico:isOrWasPartOf ; sh:minCount 1 ; sh:maxCount 1 ; sh:class rico:Record ;
+                  sh:message "A page belongs to exactly one document." ] ;
+    sh:property [ sh:path rico:width ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minExclusive 0 ;
+                  sh:message "A page has one width in pixels." ] ;
+    sh:property [ sh:path rico:height ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minExclusive 0 ;
+                  sh:message "A page has one height in pixels." ] ;
+    sh:property [ sh:path rico:hasOrHadInstantiation ; sh:minCount 1 ; sh:maxCount 1 ; sh:node shape:ImageInstantiation ;
+                  sh:message "A page has exactly one image, with its checksum." ] ;
+    sh:property [ sh:path rico:hasOrHadDigitalInstantiation ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:node shape:CanvasInstantiation ;
+                  sh:message "A page has exactly one IIIF canvas (decision AK1)." ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "The canvas of a page is derived from the image of that same page." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this rico:hasOrHadDigitalInstantiation ?c ; rico:hasOrHadInstantiation ?img .
+              ?c rico:isOrWasDerivedFromInstantiation ?other .
+              FILTER (?other != ?img)
+            }""" ] ;
+    # page order (decision K2): position, plus the link to the next page
+    sh:property [ sh:path rico:rankInSequence ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:int ; sh:minInclusive 1 ;
+                  sh:message "A page has one position in its document (rico:rankInSequence, from 1)." ] ;
+    sh:property [ sh:path rico:directlyPrecedesInSequence ; sh:maxCount 1 ; sh:class rico:RecordPart ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "Two pages of the same document have the same position." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this rico:isOrWasPartOf ?d ; rico:rankInSequence ?r .
+              ?o rico:isOrWasPartOf ?d ; rico:rankInSequence ?r .
+              FILTER (?o != $this)
+            }""" ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "Page positions in a document start at 1 and have no gaps." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this rico:isOrWasPartOf ?d ; rico:rankInSequence ?r .
+              FILTER (?r > 1)
+              FILTER NOT EXISTS { ?p rico:isOrWasPartOf ?d ; rico:rankInSequence ?r0 . FILTER (?r0 = ?r - 1) }
+            }""" ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "A page must directly precede the next page of its document." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this rico:isOrWasPartOf ?d ; rico:rankInSequence ?r .
+              ?o rico:isOrWasPartOf ?d ; rico:rankInSequence ?r2 .
+              FILTER (?r2 = ?r + 1)
+              FILTER NOT EXISTS { $this rico:directlyPrecedesInSequence ?o }
+            }""" ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "A page may only precede the page that follows it in its document." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this rico:isOrWasPartOf ?d ; rico:rankInSequence ?r ; rico:directlyPrecedesInSequence ?n .
+              FILTER NOT EXISTS { ?n rico:isOrWasPartOf ?d ; rico:rankInSequence ?r3 . FILTER (?r3 = ?r + 1) }
+            }""" ] ;
+    # gate 10.2, checked per page (decision T2): a recognition and a transcription for every page
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "The page has no recognition event." ;
+        sh:select """
+            SELECT $this WHERE {
+              FILTER NOT EXISTS {
+                ?e a prov:Activity ; prov:used $this ; rico:hasActivityType ?t .
+                FILTER (?t IN (cris:recognition-local, cris:recognition-inherited))
+              }
+            }""" ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "The page has no transcription event." ;
+        sh:select """
+            SELECT $this WHERE {
+              FILTER NOT EXISTS { ?e a prov:Activity ; prov:used $this ; rico:hasActivityType cris:transcription }
+            }""" ] .
+
+# --- Regions and lines (Web Annotation; no text, decision A1) ---------------------------------
+shape:Zone a sh:NodeShape ;
+    sh:targetClass oa:Annotation ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rico:identifier ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:pattern "^z-" ;
+                  sh:message "A zone keeps the TEI id of its zone (z-...)." ] ;
+    sh:property [ sh:path dcterms:type ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:in ( cris:text_block cris:text_line ) ;
+                  sh:message "A zone is a text region or a text line." ] ;
+    sh:property [ sh:path rico:isOrWasPartOf ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:message "A zone is part of exactly one thing: a region of its page, or a line of its region." ] ;
+    sh:property [ sh:path oa:hasBody ; sh:maxCount 0 ;
+                  sh:message "The RDF carries no text of any line (decision A1)." ] ;
+    sh:property [ sh:path oa:hasTarget ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ; sh:node shape:ZoneTarget ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "A region is part of a page and is drawn on that same page." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this dcterms:type cris:text_block .
+              FILTER NOT EXISTS { $this rico:isOrWasPartOf ?p . ?p a rico:RecordPart . $this oa:hasTarget/oa:hasSource ?p }
+            }""" ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "A line is part of a region and is drawn on the page of that region." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this dcterms:type cris:text_line .
+              FILTER NOT EXISTS {
+                $this rico:isOrWasPartOf ?r . ?r dcterms:type cris:text_block ; rico:isOrWasPartOf ?p .
+                $this oa:hasTarget/oa:hasSource ?p
+              }
+            }""" ] .
+
+shape:ZoneTarget a sh:NodeShape ;
+    sh:class oa:SpecificResource ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path oa:hasSource ; sh:minCount 1 ; sh:maxCount 1 ; sh:class rico:RecordPart ;
+                  sh:message "A zone points to the page it lies on." ] ;
+    sh:property [ sh:path oa:hasSelector ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ;
+                  sh:class oa:SvgSelector ; sh:node shape:Polygon ] .
+
+# Decision H1: one SVG polygon, written always the same way (determinism), with integer points.
+shape:Polygon a sh:NodeShape ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rdf:value ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+                  sh:pattern "^<svg xmlns=\"http://www\\.w3\\.org/2000/svg\"><polygon points=\"[0-9]+,[0-9]+( [0-9]+,[0-9]+){2,}\"/></svg>$" ;
+                  sh:message "The polygon is one SVG polygon with at least three integer points, written in the profile's form." ] .
+
+# --- Events (PROV-O) ----------------------------------------------------------------------------
+# Whatever carries an activity type is an event, so the page gates cannot be met by an untyped resource.
+shape:Typed a sh:NodeShape ;
+    sh:targetSubjectsOf rico:hasActivityType ;
+    sh:class prov:Activity ;
+    sh:message "Anything with an activity type must be a prov:Activity." .
+
+shape:Event a sh:NodeShape ;
+    sh:targetClass prov:Activity ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path rico:hasActivityType ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:in ( cris:recognition-local cris:recognition-inherited cris:transcription ) ;
+                  sh:message "An event is a recognition (local or inherited) or a transcription." ] ;
+    sh:property [ sh:path prov:endedAtTime ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ;
+                  sh:message "An event has exactly one date and time (xsd:dateTime, decision S1)." ] ;
+    sh:property [ sh:path prov:wasAssociatedWith ; sh:minCount 1 ;
+                  sh:or ( [ sh:class prov:Person ] [ sh:class prov:SoftwareAgent ] ) ;
+                  sh:message "The agents of an event are people or engines." ] ;
+    sh:property [ sh:path prov:wasAssociatedWith ;
+                  sh:qualifiedValueShape [ sh:class prov:Person ] ; sh:qualifiedMinCount 1 ;
+                  sh:message "An event needs the person who ran or corrected it (decision U1)." ] ;
+    sh:property [ sh:path prov:used ;
+                  sh:or ( [ sh:class rico:RecordPart ]
+                          [ sh:in ( cris:ocr-without-dictionary-or-language-model cris:text-fidelity-policy ) ] ) ;
+                  sh:message "An event uses only its page and the profile's settings or policy." ] ;
+    sh:property [ sh:path prov:used ;
+                  sh:qualifiedValueShape [ sh:class rico:RecordPart ] ; sh:qualifiedMinCount 1 ; sh:qualifiedMaxCount 1 ;
+                  sh:message "An event acts on exactly one page." ] ;
+    sh:property [ sh:path rico:isOrWasRegulatedBy ; sh:in ( cris:text-fidelity-policy ) ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "A recognition event needs its engine (a prov:SoftwareAgent)." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this rico:hasActivityType ?t . FILTER (?t IN (cris:recognition-local, cris:recognition-inherited))
+              FILTER NOT EXISTS { $this prov:wasAssociatedWith ?e . ?e a prov:SoftwareAgent }
+            }""" ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "A recognition event must state that it ran without dictionary or language model (decision I3)." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this rico:hasActivityType ?t . FILTER (?t IN (cris:recognition-local, cris:recognition-inherited))
+              FILTER NOT EXISTS { $this prov:used cris:ocr-without-dictionary-or-language-model }
+            }""" ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ; sh:prefixes shape:Prefixes ;
+        sh:message "A transcription event must follow the text fidelity policy (prov:used and rico:isOrWasRegulatedBy, decision O3)." ;
+        sh:select """
+            SELECT $this WHERE {
+              $this rico:hasActivityType cris:transcription .
+              FILTER NOT EXISTS {
+                $this prov:used cris:text-fidelity-policy ; rico:isOrWasRegulatedBy cris:text-fidelity-policy
+              }
+            }""" ] .
+
+# --- Lexicon (OntoLex-Lemon core; ADR 0012 amendment of 2026-10-28, decisions BI1 to BL1) ---------
+# The lexicon is a prov:Collection of entries and carries the SHA-256 of the S5 table (as the TEI
+# instantiation carries the one of the TEI). The shapes are closed, so no text can ride on an entry
+# or a form: the only text is a form's written representation and the gloss (decision A1).
+# Not checked here, because SHACL sees one file at a time: that every line a form is attested on
+# exists in the RDF of its document. The exporter checks it.
+shape:Lexicon a sh:NodeShape ;
+    sh:targetClass prov:Collection ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path prov:hadMember ; sh:minCount 1 ; sh:nodeKind sh:IRI ; sh:class ontolex:LexicalEntry ;
+                  sh:message "A lexicon has entries, and each is a lexical entry with an address." ] ;
+    sh:property [ sh:path premis:fixity ; sh:minCount 1 ; sh:maxCount 1 ; sh:node shape:Sha256 ;
+                  sh:message "A lexicon carries the SHA-256 of the table it was made from." ] .
+
+shape:LexicalEntry a sh:NodeShape ;
+    sh:targetClass ontolex:LexicalEntry ;
+    sh:nodeKind sh:IRI ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path ontolex:canonicalForm ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ;
+                  sh:class ontolex:Form ;
+                  sh:message "An entry has exactly one canonical form (decision BK1: the lemma as written)." ] ;
+    sh:property [ sh:path ontolex:otherForm ; sh:nodeKind sh:IRI ; sh:class ontolex:Form ] ;
+    sh:property [ sh:path rdfs:comment ; sh:languageIn ( "es" ) ;
+                  sh:message "The gloss of an entry is a Spanish comment (decision BJ1)." ] .
+
+shape:LexiconForm a sh:NodeShape ;
+    sh:targetClass ontolex:Form ;
+    sh:nodeKind sh:IRI ;
+    sh:closed true ; sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path ontolex:writtenRep ; sh:minCount 1 ; sh:maxCount 1 ; sh:languageIn ( "chb" ) ;
+                  sh:message "A form has one written representation, tagged chb (ADR 0004)." ] ;
+    sh:property [ sh:path cris:attestedOn ; sh:nodeKind sh:IRI ] .

@@ -1,0 +1,81 @@
+# Values of the S6 application profile (ADR 0012). The profile declares no class and one property
+# (cris:attestedOn, decision BL1 of the lexicon amendment): otherwise only the individuals below,
+# used as values of RiC-O and PROV-O properties. They hold for any
+# collection the pipeline exports, so they live here; collection values (orthographic norms,
+# transmission states, agents) come from the corpus config and are written by the exporter.
+#
+# The exporter copies this file into the shared graph of every export, so the labels travel with
+# the data. The namespace is the provisional one of ADR 0003 (decision V1); it changes together
+# with the data base when a persistent identifier is chosen.
+
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
+@prefix prov:    <http://www.w3.org/ns/prov#> .
+@prefix rico:    <https://www.ica.org/standards/RiC/ontology#> .
+@prefix cris:    <https://w3id.org/project-uricoechea/vocab/1.0#> .
+
+# --- Activity types (decision E1: RiC-O activity types, grouped as SKOS, as in RiC-O's examples) --
+cris:activity-types a skos:ConceptScheme ;
+    skos:prefLabel "Tipos de evento del perfil CRIS"@es , "CRIS profile activity types"@en .
+
+cris:recognition-local a rico:ActivityType , skos:Concept ;
+    skos:inScheme cris:activity-types ;
+    skos:prefLabel "Reconocimiento hecho en el proyecto"@es , "Recognition run in the project"@en .
+
+cris:recognition-inherited a rico:ActivityType , skos:Concept ;
+    skos:inScheme cris:activity-types ;
+    skos:prefLabel "Reconocimiento heredado de una fuente anterior"@es ,
+                   "Recognition inherited from an upstream source"@en .
+
+cris:transcription a rico:ActivityType , skos:Concept ;
+    skos:inScheme cris:activity-types ;
+    skos:prefLabel "Transcripción (corrección humana contra la imagen)"@es ,
+                   "Transcription (human correction against the image)"@en .
+
+# --- Kinds of zone -----------------------------------------------------------------------------
+cris:zone-kinds a skos:ConceptScheme ;
+    skos:prefLabel "Tipos de zona de una página"@es , "Kinds of page zone"@en .
+
+cris:text_block a rico:Type , skos:Concept ;
+    skos:inScheme cris:zone-kinds ;
+    skos:prefLabel "Región de texto"@es , "Text region"@en .
+
+cris:text_line a rico:Type , skos:Concept ;
+    skos:inScheme cris:zone-kinds ;
+    skos:prefLabel "Línea de texto"@es , "Text line"@en .
+
+# --- Documentary form types ----------------------------------------------------------------------
+cris:documentary-forms a skos:ConceptScheme ;
+    skos:prefLabel "Tipos documentales del perfil CRIS"@es , "CRIS profile documentary form types"@en .
+
+# A letter must name its author (spec 5.6, 6.4).
+cris:letter a rico:DocumentaryFormType , skos:Concept ;
+    skos:inScheme cris:documentary-forms ;
+    skos:prefLabel "Carta"@es , "Letter"@en .
+
+# An edited volume of letters by several people (decision Y2): not a letter, no author per letter.
+cris:edited-correspondence-volume a rico:DocumentaryFormType , skos:Concept ;
+    skos:inScheme cris:documentary-forms ;
+    skos:prefLabel "Volumen de correspondencia editada"@es , "Edited correspondence volume"@en .
+
+# --- Constants of the pipeline ------------------------------------------------------------------
+# S4 refuses a page whose recognition did not run with the dictionary and the language model
+# switched off (spec 5.3d), so every recognition event in an export used these settings (decision I3).
+cris:ocr-without-dictionary-or-language-model a prov:Entity ;
+    rdfs:label "OCR sin diccionario ni modelo de lenguaje"@es ,
+               "OCR with dictionary and language-model correction switched off"@en ;
+    rdfs:comment "Ajuste exigido por la etapa S4: rechaza toda página cuyo reconocimiento no lo declare."@es ,
+                 "Setting enforced by stage S4, which refuses any page whose recognition does not state it."@en .
+
+# The text fidelity policy that every transcription follows (ADR 0007; decision O3).
+cris:text-fidelity-policy a prov:Plan , rico:Rule ;
+    rdfs:label "Política de fidelidad del texto (ADR 0007)"@es , "Text fidelity policy (ADR 0007)"@en .
+
+# --- The one property of the profile (lexicon amendment, decision BL1) ----------------------------
+# A form of the lexicon is attested on a line of the edition: the object is the line's address
+# (line/<page id>-<line id>), the same one the document's RDF gives to the line.
+cris:attestedOn a rdf:Property ;
+    rdfs:label "documentada en"@es , "attested on"@en ;
+    rdfs:comment "Línea de la edición en la que aparece una forma de una entrada del léxico."@es ,
+                 "Line of the edition on which a form of a lexicon entry occurs."@en .
