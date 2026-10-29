@@ -17,7 +17,7 @@
 
 # --- Activity types (decision E1: RiC-O activity types, grouped as SKOS, as in RiC-O's examples) --
 cris:activity-types a skos:ConceptScheme ;
-    skos:prefLabel "Tipos de evento del perfil CRIS"@es , "CRIS profile activity types"@en .
+    skos:prefLabel "Tipos de evento del vocabulario"@es , "Vocabulary activity types"@en .
 
 cris:recognition-local a rico:ActivityType , skos:Concept ;
     skos:inScheme cris:activity-types ;
@@ -47,7 +47,7 @@ cris:text_line a rico:Type , skos:Concept ;
 
 # --- Documentary form types ----------------------------------------------------------------------
 cris:documentary-forms a skos:ConceptScheme ;
-    skos:prefLabel "Tipos documentales del perfil CRIS"@es , "CRIS profile documentary form types"@en .
+    skos:prefLabel "Tipos documentales del vocabulario"@es , "Vocabulary documentary form types"@en .
 
 # A letter must name its author (spec 5.6, 6.4).
 cris:letter a rico:DocumentaryFormType , skos:Concept ;
